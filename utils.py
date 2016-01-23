@@ -27,3 +27,39 @@ def iterate_nested_dict(dict, keys=()):
                 yield rv
     else:
         yield (keys, dict)
+
+
+def matrix(rows_text, columns_text, alignment):
+
+    """
+    m: row
+    n: column
+    lst: items
+    |x| | |
+    | | |x|
+    """
+    rows = tokenize(rows_text)
+    columns = tokenize(columns_text)
+
+    longest_row = max(len(x) for x in rows)
+    longest_column = max(len(x) for x in columns)
+
+    # Header
+    matrix = " " * longest_column
+    for row in rows:
+        matrix += "{word:^{width}}".format(word=row, width=longest_row)
+    matrix += "\n"
+
+    # Body
+    for (i, row) in enumerate(rows):
+        matrix += "{word:<{width}}".format(word=columns[i], width=longest_column)
+        matrix += "|"
+        for (j, column) in enumerate(columns):
+            if (j, i) in alignment:
+                marker = "x"
+            else:
+                marker = " "
+            matrix += "{word:^{width}}".format(word=marker, width=longest_row - 1)
+            matrix += "|"
+        matrix += "\n"
+    return matrix
