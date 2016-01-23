@@ -4,7 +4,7 @@ from collections import defaultdict
 
 
 class IBMModel2():
-
+    MIN_PROB = 1.0e-12
 
     ''' IBM 2 Algorithm
     carry over t(e|f) from Model 1
@@ -85,8 +85,8 @@ class IBMModel2():
 
             for e_s, f_s in self.sentence_pairs:
 
-                e_tokens = tokenize(e_s)  # target language words
-                f_tokens = [None] + tokenize(f_s)  # source language words
+                e_tokens = tokenize(e_s)  # output / target language words
+                f_tokens = [None] + tokenize(f_s)  # input / source language words
 
                 le = len(e_tokens)
                 lf = len(f_tokens) - 1
@@ -134,8 +134,8 @@ class IBMModel2():
             previousIndex = i - 1
             previous_target_word = out[previousIndex] if i > 0 and previousIndex < len(out) else None
 
-            for ((target_word, ), ibm_prob) in iterate_nested_dict(self.probabilities[source_word]):
-                combined_prob = ibm_prob * language_model[previous_target_word][target_word]
+            for ((target_word,), ibm_prob) in iterate_nested_dict(self.probabilities[source_word]):
+                combined_prob = ibm_prob * language_model.predict(previous_target_word, target_word)
                 if combined_prob >= best_prob:
                     best_prob = combined_prob
                     best_translation = target_word
@@ -145,5 +145,27 @@ class IBMModel2():
 
         return " ".join(out)
 
-    def align(self, src_sentence, target_sentence):
-        return
+    def align(self, e_s, f_s):
+
+        e_tokens = tokenize(e_s)
+        f_tokens = tokenize(f_s)
+
+        le = len(e_tokens)
+        lf = len(f_tokens)
+
+        alignments = []
+
+        for j, e in enumerate(e_tokens):
+
+            best_prob = self.probabilities[e][None] * self.alignments[0][j][le][lf]
+            best_alignment = (j, None)
+
+            for i, f in enumerate(f_tokens):
+                prob = self.probabilities[e][f] * self.alignments[i + 1][j][le][lf]
+                if prob > best_prob:
+                    best_prob = prob
+                    best_alignment = (j, i)
+
+            alignments.append(best_alignment)
+
+        return alignments

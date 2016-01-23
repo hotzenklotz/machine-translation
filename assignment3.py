@@ -1,18 +1,21 @@
 from ibm1 import IBMModel1
 from ibm2 import IBMModel2
 from news_corpus import NewsCorpus
-from language_model import train_language_model
-from utils import iterate_nested_dict
+from language_model import LanguageModel
+import time
 from word_alignment import grow_diag_final
 
 
 def translate_sentence(sentence, ibm_model, language_model):
 
     translation = ibm_model.predict_with_language_model(sentence, language_model)
+    alignment = ibm_model.align(sentence, translation)
 
-    return translation
+    return translation, alignment
 
 if __name__ == '__main__':
+
+    start_time = time.time()
 
     test_pairs = [
         ("the house", "das haus"),
@@ -28,7 +31,8 @@ if __name__ == '__main__':
 
     print "Starting Language Model Training..."
     # Train a German language model
-    language_model = train_language_model([german for (english, german) in sentence_pairs])
+    language_model = LanguageModel()
+    language_model.train([german for (english, german) in sentence_pairs])
 
     print "Starting IBM Model 1 Training..."
     ibm1 = IBMModel1(sentence_pairs)
@@ -43,9 +47,12 @@ if __name__ == '__main__':
     print "Translating first 20 test sentences..."
     # Translate the English sentences into German
     for (english, german) in sentence_pairs[0:20]:
-        translation = translate_sentence(english, ibm2_en_to_ger, language_model)
+        translation, alignment = translate_sentence(english, ibm2_en_to_ger, language_model)
 
         print "--------"
         print english
         print translation
+        print alignment
+
+    print "Translation took %ss" % (time.time() - start_time)
 
