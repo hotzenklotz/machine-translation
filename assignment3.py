@@ -1,4 +1,5 @@
 import time
+from copy import deepcopy
 from ibm1 import IBMModel1
 from ibm2 import IBMModel2
 from news_corpus import NewsCorpus
@@ -7,15 +8,21 @@ from word_alignment import grow_diag_final
 from utils import matrix
 
 
-def translate_sentence(sentence, ibm_model_e_to_f, ibm_model_f_to_e, language_model):
+def translate(sentence, ibm_model, language_model):
+    print ibm_model.predict(sentence)
+    print ibm_model.predict_with_language_model(sentence, language_model)
 
-    translation = ibm_model_e_to_f.predict_with_language_model(sentence, language_model)
+def calc_alignments(english, german, ibm_model_e_to_f, ibm_model_f_to_e):
 
-    alignment_e_to_f = ibm_model_e_to_f.align(sentence, translation)
-    alignment_f_to_e = ibm_model_f_to_e.align(sentence, translation)
-    alignment = grow_diag_final(len(sentence), len(translation), alignment_e_to_f, alignment_f_to_e)
+    alignment_e_to_f = ibm_model_e_to_f.align(english, german)
+    alignment_f_to_e = ibm_model_f_to_e.align(english, german)
+    alignment = grow_diag_final(len(english), len(german), alignment_e_to_f, alignment_f_to_e)
+    print len(alignment_e_to_f), len(alignment_f_to_e), len(alignment)
 
-    return translation, alignment
+    print alignment
+    print matrix(english, german, alignment)
+
+    return alignment
 
 if __name__ == '__main__':
 
@@ -29,36 +36,44 @@ if __name__ == '__main__':
 
     print "Starting Data import..."
     # (english, german) = sentence_pairs
-    sentence_pairs = NewsCorpus().get_test_sentence_pairs()
-    # sentence_pairs = NewsCorpus().get_sentence_pairs()
-    # sentence_pairs = test_pairs
+    en_ger_sentence_pairs = NewsCorpus().get_test_sentence_pairs()
+    # en_ger_sentence_pairs = NewsCorpus().get_sentence_pairs()
+    # en_ger_sentence_pairs = test_pairs
+
+    ger_en_sentence_pairs = ([(german, english) for (english, german) in en_ger_sentence_pairs])
 
     print "Starting Language Model Training..."
     # Train a German language model
     language_model = LanguageModel()
-    language_model.train([german for (english, german) in sentence_pairs])
+    language_model.train([german for (english, german) in en_ger_sentence_pairs])
 
     print "Starting IBM Model 1 Training..."
-    ibm1 = IBMModel1(sentence_pairs)
-    ibm1.train(10)
+    ibm1_en_to_ger = IBMModel1(en_ger_sentence_pairs)
+    ibm1_en_to_ger.train(10)
+
+    ibm1_ger_to_en = IBMModel1(ger_en_sentence_pairs)
+    ibm1_ger_to_en.train(10)
+
 
     print "Starting IBM Model 2 Training..."
-    ibm2_en_to_ger = IBMModel2(ibm1.probabilities, sentence_pairs)
+    ibm2_en_to_ger = IBMModel2(ibm1_en_to_ger.translations, en_ger_sentence_pairs)
     ibm2_en_to_ger.train(5)
 
-    ibm2_ger_to_en = IBMModel2(ibm1.probabilities, ([(german, english) for (english, german) in sentence_pairs]))
+    ibm2_ger_to_en = IBMModel2(ibm1_ger_to_en.translations, ger_en_sentence_pairs)
     ibm2_ger_to_en.train(5)
 
     print "Translating first 20 test sentences..."
     # Translate the English sentences into German
-    for (english, german) in sentence_pairs[0:20]:
-        translation, alignment = translate_sentence(english, ibm2_en_to_ger, ibm2_ger_to_en, language_model)
+    for (english, german) in en_ger_sentence_pairs[0:20]:
 
         print "--------"
         print english
-        print translation
-        print alignment
-        print matrix(english, translation, alignment)
+
+
+
+        translate(german, ibm2_en_to_ger, language_model)
+        calc_alignments(english, german, ibm2_en_to_ger, ibm2_ger_to_en)
+
 
     print "Translation took %ss" % (time.time() - start_time)
 

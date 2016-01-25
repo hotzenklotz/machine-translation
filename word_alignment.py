@@ -1,7 +1,7 @@
 from collections import defaultdict
 
 
-def grow_diag_final(len_f, len_e, e2f, f2e):
+def grow_diag_final(len_e, len_f,  e2f, f2e):
     neighboring = [(-1, 0), (0, -1), (1, 0), (0, 1), (-1, -1), (-1, 1), (1, -1), (1, 1)]
     alignment = set(e2f).intersection(set(f2e))
     union = set(e2f).union(set(f2e))

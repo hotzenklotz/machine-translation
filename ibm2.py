@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-from utils import tokenize, nested_defaultdict, iterate_nested_dict
+from utils import tokenize, nested_defaultdict, iterate_nested_dict, swap_keys
 from collections import defaultdict
 
 
@@ -59,11 +59,12 @@ class IBMModel2():
     def __init__(self, ibm1_model, sentence_pairs):
         self.sentence_pairs = sentence_pairs
 
-        self.probabilities = ibm1_model
+        self.translations = ibm1_model
+        self.inverse_translations = None
         self.alignments = None
 
     def train(self, num_iteration=10):
-        probabilities = self.probabilities
+        translations = self.translations
         alignments = self.alignments
 
         for e_s, f_s in self.sentence_pairs:
@@ -97,32 +98,62 @@ class IBMModel2():
                     stotal[e] = 0
 
                     for i, f in enumerate(f_tokens):
-                        stotal[e] += probabilities[e][f] * alignments[i][j][le][lf]
+                        stotal[e] += translations[e][f] * alignments[i][j][le][lf]
 
                 # E step (b): Collect counts
                 for j, e in enumerate(e_tokens):
                     for i, f in enumerate(f_tokens):
-                        c = probabilities[e][f] * alignments[i][j][le][lf] / stotal[e]
+                        c = translations[e][f] * alignments[i][j][le][lf] / stotal[e]
                         count[e][f] += c
                         total[f] += c
                         count_a[i][j][le][lf] += c
                         total_a[j][le][lf] += c
 
-            # M step: Update probabilities with maximum likelihood estimate
+            # M step: Update translations with maximum likelihood estimate
             for ((e, f), count_e_f) in iterate_nested_dict(count):
-                probabilities[e][f] = count_e_f / total[f]
+                translations[e][f] = count_e_f / total[f]
 
             for ((i, j, le, lf), counta_i_j) in iterate_nested_dict(count_a):
                 alignments[i][j][le][lf] = counta_i_j / total_a[j][le][lf]
 
-            self.probabilities = probabilities
+            self.translations = translations
             self.alignments = alignments
 
-        return probabilities, alignments
+        return translations, alignments
+
+    def predict(self, sentence):
+
+        # swap e, f for quicker look-ups
+        # p(f|e) --> p(e|f)
+        if self.inverse_translations is None:
+            self.inverse_translations = swap_keys(self.translations)
+
+        tokens = tokenize(sentence)
+        out = []
+
+        for source_word in tokens:
+            best_translation = None
+            best_prob = 0
+
+            for ((target_word,), ibm_prob) in iterate_nested_dict(self.inverse_translations[source_word]):
+                if ibm_prob >= best_prob:
+                    best_prob = ibm_prob
+                    best_translation = target_word
+
+            if not best_translation == None:
+                out.append(best_translation)
+
+        return " ".join(out)
+
 
     def predict_with_language_model(self, sentence, language_model):
         # Lexical Translation
         # argmax_e p(e|f) = argmax_e p(f|e) * p(e)
+
+        # swap e, f for quicker look-ups
+        # p(f|e) --> p(e|f)
+        if self.inverse_translations is None:
+            self.inverse_translations = swap_keys(self.translations)
 
         tokens = tokenize(sentence)
         out = []
@@ -134,7 +165,7 @@ class IBMModel2():
             previousIndex = i - 1
             previous_target_word = out[previousIndex] if i > 0 and previousIndex < len(out) else None
 
-            for ((target_word,), ibm_prob) in iterate_nested_dict(self.probabilities[source_word]):
+            for ((target_word,), ibm_prob) in iterate_nested_dict(self.inverse_translations[source_word]):
                 combined_prob = ibm_prob * language_model.predict(previous_target_word, target_word)
                 if combined_prob >= best_prob:
                     best_prob = combined_prob
@@ -157,11 +188,11 @@ class IBMModel2():
 
         for j, e in enumerate(e_tokens):
 
-            best_prob = self.probabilities[e][None] * self.alignments[0][j][le][lf]
+            best_prob = self.translations[e][None] * self.alignments[0][j][le][lf]
             best_alignment = (j, None)
 
             for i, f in enumerate(f_tokens):
-                prob = self.probabilities[e][f] * self.alignments[i + 1][j][le][lf]
+                prob = self.translations[e][f] * self.alignments[i + 1][j][le][lf]
                 if prob > best_prob:
                     best_prob = prob
                     best_alignment = (j, i)

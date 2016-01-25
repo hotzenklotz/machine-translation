@@ -23,21 +23,34 @@ def nested_defaultdict(levels=1, final=int):
 def iterate_nested_dict(dict, keys=()):
     if type(dict) == defaultdict:
         for key, value in dict.iteritems():
-            for rv in iterate_nested_dict(value, keys + (key, )):
+            for rv in iterate_nested_dict(value, keys + (key,)):
                 yield rv
     else:
         yield (keys, dict)
 
 
-def matrix(rows_text, columns_text, alignment):
+def swap_keys(nested_dict):
+    # Swap the keys of a nested object
+    # a[i][j] = value --> b[j][i] = value
+    inverse_dict = nested_defaultdict(2, int)
 
-    """
-    m: row
-    n: column
-    lst: items
-    |x| | |
-    | | |x|
-    """
+    for ((key1, key2), value) in iterate_nested_dict(nested_dict):
+        inverse_dict[key2][key1] = value
+
+    return inverse_dict
+
+
+def matrix(rows_text, columns_text, alignment):
+    # Prints a matrix of two sentence alignments
+
+    '''
+          wouldnt  you   know    it
+    kommen|  x   |      |      |      |
+    kommen|  x   |      |      |      |
+    kommen|  x   |      |      |      |
+    es    |      |      |      |  x   |
+    '''
+
     rows = tokenize(rows_text)
     columns = tokenize(columns_text)
 
@@ -51,10 +64,10 @@ def matrix(rows_text, columns_text, alignment):
     matrix += "\n"
 
     # Body
-    for (i, row) in enumerate(rows):
-        matrix += "{word:<{width}}".format(word=columns[i], width=longest_column)
+    for (i, column) in enumerate(columns):
+        matrix += "{word:<{width}}".format(word=column, width=longest_column)
         matrix += "|"
-        for (j, column) in enumerate(columns):
+        for (j, row) in enumerate(rows):
             if (j, i) in alignment:
                 marker = "x"
             else:

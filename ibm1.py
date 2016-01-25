@@ -32,18 +32,18 @@ class IBMModel1():
     def __init__(self, sentence_pairs):
 
         self.sentence_pairs = sentence_pairs
-        self.probabilities = None
+        self.translations = None
 
     def train(self, num_iterations=10):
-        probabilities = self.probabilities
+        translations = self.translations
 
-        # Uniformly init probabilities
+        # Uniformly init translations
         for e_s, f_s in self.sentence_pairs:
             e_tokens = tokenize(e_s)  # target language words
             f_tokens = tokenize(f_s)  # source language words
 
             uniform_prob = 1.0 / (len(e_tokens) + len(f_tokens))
-            probabilities = nested_defaultdict(2, lambda: uniform_prob)
+            translations = nested_defaultdict(2, lambda: uniform_prob)
 
         # while not converged
         for step in range(0, num_iterations):
@@ -64,18 +64,18 @@ class IBMModel1():
                     total_s[e] = 0.0
 
                     for f in f_tokens:
-                        total_s[e] += probabilities[e][f]
+                        total_s[e] += translations[e][f]
 
                 # E step (b): Collect counts
                 for e in e_tokens:
                     for f in f_tokens:
-                        count[e][f] += probabilities[e][f] / total_s[e]
-                        total[f] += probabilities[e][f] / total_s[e]
+                        count[e][f] += translations[e][f] / total_s[e]
+                        total[f] += translations[e][f] / total_s[e]
 
-            # M step: Update probabilities with maximum likelihood estimate
+            # M step: Update translations with maximum likelihood estimate
             for ((e, f), count_e_f) in iterate_nested_dict(count):
-                probabilities[e][f] = count_e_f / total[f]
+                translations[e][f] = count_e_f / total[f]
 
-            self.probabilities = probabilities
+            self.translations = translations
 
-        return probabilities
+        return translations
