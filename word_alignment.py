@@ -13,9 +13,12 @@ def grow_diag_final(len_e, len_f,  e2f, f2e):
 
     def grow_diag():
 
-        prev_len = len(alignment) - 1
+        added_new_point = True
+
         # iterate until no new points added
-        while prev_len < len(alignment):
+        while added_new_point:
+
+            added_new_point = False
             # for english word e = 0 ... en
             for e in range(len_e):
                 # for foreign word f = 0 ... fn
@@ -29,10 +32,13 @@ def grow_diag_final(len_e, len_f,  e2f, f2e):
                             # if ( ( e-new not aligned and f-new not aligned)
                             # and (e-new, f-new in union(e2f, f2e) )
                             if (e_new not in aligned and f_new not in aligned) and neighbor in union:
+                                prev_len = len(alignment)
+
                                 alignment.add(neighbor)
                                 aligned['e'].add(e_new)
                                 aligned['f'].add(f_new)
-                                prev_len += 1
+
+                                added_new_point = prev_len != len(alignment)
 
     def final(a):
         # for english word e = 0 ... en
@@ -45,6 +51,10 @@ def grow_diag_final(len_e, len_f,  e2f, f2e):
                     alignment.add((e_new, f_new))
                     aligned['e'].add(e_new)
                     aligned['f'].add(f_new)
+
+    # if len(alignment) == 0:
+    #     print "Shit"
+    #     return alignment
 
     grow_diag()
     final(e2f)

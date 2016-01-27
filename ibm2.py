@@ -93,15 +93,14 @@ class IBMModel2():
                 lf = len(f_tokens) - 1
 
                 # E step (a): Compute normalization factors to weigh counts
-                for j, e in enumerate(e_tokens):
-                    e = e_tokens[j]
+                for j, e in enumerate(e_tokens, 1):
                     stotal[e] = 0
 
                     for i, f in enumerate(f_tokens):
                         stotal[e] += translations[e][f] * alignments[i][j][le][lf]
 
                 # E step (b): Collect counts
-                for j, e in enumerate(e_tokens):
+                for j, e in enumerate(e_tokens, 1):
                     for i, f in enumerate(f_tokens):
                         c = translations[e][f] * alignments[i][j][le][lf] / stotal[e]
                         count[e][f] += c
@@ -186,13 +185,13 @@ class IBMModel2():
 
         alignments = []
 
-        for j, e in enumerate(e_tokens):
+        for j, e in enumerate(e_tokens, 1):
 
             best_prob = self.translations[e][None] * self.alignments[0][j][le][lf]
             best_alignment = (j, None)
 
-            for i, f in enumerate(f_tokens):
-                prob = self.translations[e][f] * self.alignments[i + 1][j][le][lf]
+            for i, f in enumerate(f_tokens, 1):
+                prob = self.translations[e][f] * self.alignments[i][j][le][lf]
                 if prob > best_prob:
                     best_prob = prob
                     best_alignment = (j, i)

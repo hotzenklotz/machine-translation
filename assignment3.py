@@ -5,7 +5,7 @@ from ibm2 import IBMModel2
 from news_corpus import NewsCorpus
 from language_model import LanguageModel
 from word_alignment import grow_diag_final
-from utils import matrix
+from utils import matrix, tokenize
 
 
 def translate(sentence, ibm_model, language_model):
@@ -14,13 +14,16 @@ def translate(sentence, ibm_model, language_model):
 
 def calc_alignments(english, german, ibm_model_e_to_f, ibm_model_f_to_e):
 
+    e_tokens = tokenize(english)
+    f_tokens = tokenize(german)
+
     alignment_e_to_f = ibm_model_e_to_f.align(english, german)
-    alignment_f_to_e = ibm_model_f_to_e.align(english, german)
-    alignment = grow_diag_final(len(english), len(german), alignment_e_to_f, alignment_f_to_e)
+    alignment_f_to_e = ibm_model_f_to_e.align(german, english)
+    alignment = grow_diag_final(len(e_tokens), len(f_tokens), alignment_e_to_f, alignment_f_to_e)
     print len(alignment_e_to_f), len(alignment_f_to_e), len(alignment)
 
     print alignment
-    print matrix(english, german, alignment)
+    print matrix(e_tokens, f_tokens, alignment)
 
     return alignment
 
@@ -36,8 +39,8 @@ if __name__ == '__main__':
 
     print "Starting Data import..."
     # (english, german) = sentence_pairs
-    en_ger_sentence_pairs = NewsCorpus().get_test_sentence_pairs()
-    # en_ger_sentence_pairs = NewsCorpus().get_sentence_pairs()
+    # en_ger_sentence_pairs = NewsCorpus().get_test_sentence_pairs()
+    en_ger_sentence_pairs = NewsCorpus().get_sentence_pairs()
     # en_ger_sentence_pairs = test_pairs
 
     ger_en_sentence_pairs = ([(german, english) for (english, german) in en_ger_sentence_pairs])
@@ -68,7 +71,6 @@ if __name__ == '__main__':
 
         print "--------"
         print english
-
 
 
         translate(german, ibm2_en_to_ger, language_model)

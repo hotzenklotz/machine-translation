@@ -51,8 +51,8 @@ def matrix(rows_text, columns_text, alignment):
     es    |      |      |      |  x   |
     '''
 
-    rows = tokenize(rows_text)
-    columns = tokenize(columns_text)
+    rows = rows_text
+    columns = columns_text
 
     longest_row = max(len(x) for x in rows)
     longest_column = max(len(x) for x in columns)
