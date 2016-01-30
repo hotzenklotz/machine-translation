@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 from utils import tokenize, nested_defaultdict, iterate_nested_dict, swap_keys
 from collections import defaultdict
+from dill import dump, load
 
 
 class IBMModel2():
@@ -120,8 +121,8 @@ class IBMModel2():
 
         return translations, alignments
 
-    def predict(self, sentence):
-
+    def lexical_translation(self, sentence):
+        # # Lexical Translation
         # swap e, f for quicker look-ups
         # p(f|e) --> p(e|f)
         if self.inverse_translations is None:
@@ -144,9 +145,13 @@ class IBMModel2():
 
         return " ".join(out)
 
+    def viterbi_approximation(self, sentece):
+        # argmax_e,a P(e) * P(f, a | e)
+        pass
+        
 
-    def predict_with_language_model(self, sentence, language_model):
-        # Lexical Translation
+    def lexical_translation_with_language_model(self, sentence, language_model):
+        # Lexical Translation with Noisy Channel Model
         # argmax_e p(e|f) = argmax_e p(f|e) * p(e)
 
         # swap e, f for quicker look-ups
@@ -199,3 +204,9 @@ class IBMModel2():
             alignments.append(best_alignment)
 
         return alignments
+
+    def save_to_file(self):
+        dump(self, open("model2.p", "wb"))
+
+    def restore_from_file(self):
+        self = load(open("model2.p", "rb"))

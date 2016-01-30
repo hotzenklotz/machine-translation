@@ -64,10 +64,10 @@ def matrix(rows_text, columns_text, alignment):
     matrix += "\n"
 
     # Body
-    for (i, column) in enumerate(columns):
+    for (i, column) in enumerate(columns, 1):
         matrix += "{word:<{width}}".format(word=column, width=longest_column)
         matrix += "|"
-        for (j, row) in enumerate(rows):
+        for (j, row) in enumerate(rows, 1):
             if (j, i) in alignment:
                 marker = "x"
             else:
@@ -76,3 +76,19 @@ def matrix(rows_text, columns_text, alignment):
             matrix += "|"
         matrix += "\n"
     return matrix
+
+
+class HashableDict(dict):
+    """
+    This class implements a hashable dict, which can be
+    put into a set.
+    """
+
+    def __key(self):
+        return tuple((k, self[k]) for k in self)
+
+    def __hash__(self):
+        return hash(self.__key())
+
+    def __eq__(self, other):
+        return self.__key() == other.__key()

@@ -1,5 +1,4 @@
 import time
-from copy import deepcopy
 from ibm1 import IBMModel1
 from ibm2 import IBMModel2
 from news_corpus import NewsCorpus
@@ -9,8 +8,8 @@ from utils import matrix, tokenize
 
 
 def translate(sentence, ibm_model, language_model):
-    print ibm_model.predict(sentence)
-    print ibm_model.predict_with_language_model(sentence, language_model)
+    print ibm_model.lexical_translation(sentence)
+    print ibm_model.lexical_translation_with_language_model(sentence, language_model)
 
 def calc_alignments(english, german, ibm_model_e_to_f, ibm_model_f_to_e):
 
@@ -70,7 +69,7 @@ if __name__ == '__main__':
     for (english, german) in en_ger_sentence_pairs[0:20]:
 
         print "--------"
-        print english
+        print english, german
 
 
         translate(german, ibm2_en_to_ger, language_model)
