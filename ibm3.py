@@ -23,15 +23,15 @@ class IBMModel3:
         for step in range(0, num_iterations):
             print "Converging-Step ", step
 
-            count_t = nested_defaultdict(2, int)
-            count_f = nested_defaultdict(2, int)
-            count_d = nested_defaultdict(4, int)
+            count_t = nested_defaultdict(2, lambda: IBMModel3.MIN_PROB)
+            count_f = nested_defaultdict(2, lambda: IBMModel3.MIN_PROB)
+            count_d = nested_defaultdict(4, lambda: IBMModel3.MIN_PROB)
             count_p0 = 0.0
             count_p1 = 0.0
 
-            total_t = defaultdict(int)
-            total_f = defaultdict(int)
-            total_d = nested_defaultdict(3, int)
+            total_t = defaultdict(lambda: IBMModel3.MIN_PROB)
+            total_f = defaultdict(lambda: IBMModel3.MIN_PROB)
+            total_d = nested_defaultdict(3, lambda: IBMModel3.MIN_PROB)
 
             for (e_s, f_s) in self.sentence_pairs:
 
@@ -54,7 +54,7 @@ class IBMModel3:
                 for a in A:
                     c = self.prob_t_a_given_s(a, e_tokens, f_tokens) / c_total
 
-                    for j in range(0, le + 1):
+                    for j in range(1, le):
                         en_word = e_tokens[j]
                         fr_word = f_tokens[a[j]]
 
@@ -76,7 +76,7 @@ class IBMModel3:
                     # Count fertilities
                     for i, fr_word in enumerate(f_tokens, 1):  # TODO NULL OTKEN OR NOT?
                         fertility = 0
-                        for j in range(0, le):
+                        for j in range(1, le):
                             if i == a[j]:
                                 fertility += 1
 
@@ -145,8 +145,8 @@ class IBMModel3:
 
         best_alignment = new_alignment
 
-        for i in range(0, lf + 1):
-            for j in range(1, le + 1):
+        for j in range(1, le + 1):
+            for i in range(0, lf + 1):
 
                 # best IBM2 alignment
                 original_alignment, best_prob = find_best_alignment(j, i)
@@ -223,23 +223,23 @@ class IBMModel3:
 
     def neighboring(self, alignments, e_tokens, f_tokens, j_pegged=None):
         N = set()
-        for j in range(1, len(e_tokens) + 1):
+        for j in range(1, len(e_tokens)):
             # moves
             if j == j_pegged:
                 continue
 
-            for i in range(0, len(f_tokens) + 1):
+            for i in range(0, len(f_tokens)):
                 new_align = HashableDict(alignments)
                 new_align[j] = i
 
                 N.add(new_align)
 
-        for j1 in range(1, len(e_tokens) + 1):
+        for j1 in range(1, len(e_tokens)):
             # swaps
             if j1 == j_pegged:
                 continue
 
-            for j2 in range(1, len(e_tokens) + 1):
+            for j2 in range(1, len(e_tokens)):
                 if j2 == j_pegged or j2 == j1:
                     continue
 
