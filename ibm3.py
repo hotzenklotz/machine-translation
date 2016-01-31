@@ -1,10 +1,11 @@
 from collections import defaultdict
 from utils import nested_defaultdict, tokenize, iterate_nested_dict, HashableDict
 from math import factorial
+from sentence_pair import SentencePair
 
 
 class IBMModel3:
-    MIN_PROB = 1.0e-12
+    MIN_PROB = 1.0e-08
 
     def __init__(self, translations, alignments, sentence_pairs):
 
@@ -15,7 +16,7 @@ class IBMModel3:
         self.distortions = nested_defaultdict(4, int)
         self.fertilities = nested_defaultdict(2, lambda: 0.1)
         self.p1 = 0
-        self.null_inserts = defaultdict(lambda: [1])
+
 
     def train(self, num_iterations):
 
@@ -33,40 +34,44 @@ class IBMModel3:
             total_f = defaultdict(lambda: IBMModel3.MIN_PROB)
             total_d = nested_defaultdict(3, lambda: IBMModel3.MIN_PROB)
 
-            for (e_s, f_s) in self.sentence_pairs:
+            for sentence_pair in self.sentence_pairs:
 
-                e_tokens = tokenize(e_s)
-                f_tokens = [None] + tokenize(f_s)
+                e_tokens = sentence_pair.e_tokens
+                f_tokens = sentence_pair.f_tokens
 
                 le = len(e_tokens)
                 lf = len(f_tokens) - 1
 
                 null_insertions = 0
 
-                A, best_alignment = self.sample(e_tokens, f_tokens)
+                A, best_alignment = self.sample(sentence_pair)
+
+                sentence_pair.alignment = best_alignment.alignment
 
                 # E step (a): Compute normalization factors to weigh counts
                 c_total = 0
-                for alignment in A:
-                    c_total += self.prob_t_a_given_s(alignment, e_tokens, f_tokens)
+                for a in A:
+                    c_total += self.prob_t_a_given_s(a)
 
                 # E step (b): Collect counts
                 for a in A:
-                    c = self.prob_t_a_given_s(a, e_tokens, f_tokens) / c_total
+                    c = self.prob_t_a_given_s(a) / c_total
 
-                    for j in range(1, le):
+                    for j in range(1, lf):
+                        aj = a.alignment[j] # shorthand, equivalent to i
+
                         en_word = e_tokens[j]
-                        fr_word = f_tokens[a[j]]
+                        fr_word = f_tokens[aj - 1]
 
                         # lexical translations
                         count_t[en_word][fr_word] += c
                         total_t[fr_word] += c
 
                         # distortions
-                        count_d[j][a[j]][le][lf] += c
-                        total_d[a[j]][le][lf] += c
+                        count_d[j][aj][le][lf] += c
+                        total_d[aj][le][lf] += c
 
-                        if a[j] == 0:  # Null insertion
+                        if aj == 0:  # Null insertion
                             null_insertions += 1
 
                     # Count null insertions
@@ -77,7 +82,7 @@ class IBMModel3:
                     for i, fr_word in enumerate(f_tokens, 1):  # TODO NULL OTKEN OR NOT?
                         fertility = 0
                         for j in range(1, le):
-                            if i == a[j]:
+                            if i == aj:
                                 fertility += 1
 
                         count_f[fertility][fr_word] += c
@@ -110,17 +115,17 @@ class IBMModel3:
             self.fertilities = fertilities
             self.translations = translations
 
-    def sample(self, e_tokens, f_tokens):
+    def sample(self, sentence_pair):
         A = set()
 
-        lf = len(f_tokens)
-        le = len(e_tokens)
+        lf = len(sentence_pair.f_tokens)
+        le = len(sentence_pair.e_tokens)
 
         def find_best_alignment(j_pegged=None, i_pegged=0):
-            alignment = defaultdict(int)
+            new_alignment = SentencePair(sentence_pair)
 
             # find best alignment according to Model 2
-            for j, en_word in enumerate(e_tokens, 1):  # TODO e + 1?
+            for j, fr_word in enumerate(sentence_pair.f_tokens, 1):  # TODO e + 1?
                 if j == j_pegged:
                     best_i = i_pegged
 
@@ -128,19 +133,20 @@ class IBMModel3:
                     best_i = 0
                     max_prob = 0
 
-                    for i, fr_word in enumerate(f_tokens):
+                    for i, en_word in enumerate(sentence_pair.e_tokens):
                         prob = self.translations[en_word][fr_word] * self.alignments[i][j][lf - 1][le - 1]
                         if prob >= max_prob:
                             max_prob = prob
                             best_i = i
 
-                alignment[j] = best_i
+                new_alignment.alignment[j] = best_i
+                new_alignment.fertility[best_i].append(j)
 
-            return alignment, max_prob
+            return new_alignment
 
-        original_alignment, _ = find_best_alignment()
-        new_alignment, _ = self.hillclimb(original_alignment, e_tokens, f_tokens)
-        neighbor_alignment = self.neighboring(new_alignment, e_tokens, f_tokens)
+        original_alignment = find_best_alignment()
+        new_alignment = self.hillclimb(original_alignment)
+        neighbor_alignment = self.neighboring(new_alignment)
         A.update(neighbor_alignment)
 
         best_alignment = new_alignment
@@ -149,39 +155,39 @@ class IBMModel3:
             for i in range(0, lf + 1):
 
                 # best IBM2 alignment
-                original_alignment, best_prob = find_best_alignment(j, i)
-                new_alignment, new_prob = self.hillclimb(best_alignment, e_tokens, f_tokens, j)
-                neighbor_alignment = self.neighboring(new_alignment, e_tokens, f_tokens, j)
+                original_alignment = find_best_alignment(j, i)
+                new_alignment = self.hillclimb(original_alignment, j)
+                neighbor_alignment = self.neighboring(new_alignment, j)
                 A.update(neighbor_alignment)
 
-                if best_prob > new_prob:
+                if new_alignment.alignment_prob > best_alignment.alignment_prob:
                     best_alignment = new_alignment
 
         return A, best_alignment
 
-    def hillclimb(self, alignment, e_tokens, f_tokens, j_pegged=None):
-        max_probability = self.prob_t_a_given_s(alignment, e_tokens, f_tokens)
+    def hillclimb(self, sentence_pair, j_pegged=None):
+        max_prob = self.prob_t_a_given_s(sentence_pair)
 
         while True:
-            old_alignment = alignment
-            for neighbor_alignment in self.neighboring(alignment, e_tokens, f_tokens, j_pegged):
-                neighbor_probability = self.prob_t_a_given_s(neighbor_alignment, e_tokens, f_tokens)
+            old_alignment = sentence_pair
+            for neighbor_alignment in self.neighboring(sentence_pair, j_pegged):
+                neighbor_probability = self.prob_t_a_given_s(neighbor_alignment)
 
-                if neighbor_probability > max_probability:
-                    alignment = neighbor_alignment
-                    max_probability = neighbor_probability
+                if neighbor_probability > max_prob:
+                    sentence_pair = neighbor_alignment
+                    max_prob = neighbor_probability
 
-            if alignment == old_alignment:
+            if sentence_pair == old_alignment:
                 # Until there are no better alignments
                 break
 
-        # alignment.score = max_probability
-        return alignment, max_probability
+        sentence_pair.alignment_prob = max_prob
+        return sentence_pair
 
-    def prob_t_a_given_s(self, alignment, e_tokens, f_tokens):
+    def prob_t_a_given_s(self, sentence_pair):
 
-        lf = len(f_tokens) - 1  # exclude NULL
-        le = len(e_tokens) - 1
+        lf = len(sentence_pair.f_tokens) - 1  # exclude NULL
+        le = len(sentence_pair.e_tokens) - 1
         p1 = self.p1
         p0 = 1 - p1
 
@@ -189,7 +195,7 @@ class IBMModel3:
         MIN_PROB = IBMModel3.MIN_PROB
 
         # Combine NULL insert ion probability
-        null_fertility = len(self.null_inserts[0])
+        null_fertility = len(sentence_pair.fertility[0])
         probability *= (pow(p1, null_fertility) *
                         pow(p0, le - 2 * null_fertility))
         if probability < MIN_PROB:
@@ -203,17 +209,17 @@ class IBMModel3:
 
         # Combine fertility probabilities
         for i in range(1, lf + 1):
-            fertility = len(self.null_inserts[i])
+            fertility = len(sentence_pair.fertility[i])
             probability *= (factorial(fertility) *
-                            self.fertilities[fertility][f_tokens[i]])
+                            self.fertilities[fertility][sentence_pair.f_tokens[i]])
             if probability < MIN_PROB:
                 return MIN_PROB
 
         # Combine lexical and distortion probabilities
         for j in range(1, le + 1):
-            e = e_tokens[j]
-            i = alignment[j]
-            f = f_tokens[i]
+            e = sentence_pair.e_tokens[j]
+            i = sentence_pair.alignment[j]
+            f = sentence_pair.f_tokens[i - 1] # alignments are one-indexed, tokens zero-indexed
 
             probability *= (self.translations[e][f] * self.distortions[j][i][lf][le])
             if probability < MIN_PROB:
@@ -221,34 +227,48 @@ class IBMModel3:
 
         return probability
 
-    def neighboring(self, alignments, e_tokens, f_tokens, j_pegged=None):
+    def neighboring(self, sentence_pair, j_pegged=None):
         N = set()
-        for j in range(1, len(e_tokens)):
+        le = len(sentence_pair.e_tokens)
+        lf = len(sentence_pair.f_tokens)
+
+        for j in range(1, le):
             # moves
             if j == j_pegged:
                 continue
 
-            for i in range(0, len(f_tokens)):
-                new_align = HashableDict(alignments)
-                new_align[j] = i
+            for i in range(0, lf):
+                old_i = sentence_pair.alignment[j]
+
+                new_align = SentencePair(sentence_pair) # create a copy
+                new_align.alignment[j] = i
+                new_align.fertility[i].append(j)
+                new_align.fertility[old_i].remove(j)
 
                 N.add(new_align)
 
-        for j1 in range(1, len(e_tokens)):
+        for j1 in range(1, le):
             # swaps
             if j1 == j_pegged:
                 continue
 
-            for j2 in range(1, len(e_tokens)):
+            for j2 in range(1, le):
                 if j2 == j_pegged or j2 == j1:
                     continue
 
-                new_align = HashableDict(alignments)
+                new_align = SentencePair(sentence_pair)
+                i1 = sentence_pair.alignment[j1]
+                i2 = sentence_pair.alignment[j2]
+
 
                 # swap a_(j1), a_(j2)
-                tmp = new_align[j1]
-                new_align[j1] = new_align[j2]
-                new_align[j2] = tmp
+                new_align.alignment[j1] = i2
+                new_align.alignment[j2] = i1
+
+                new_align.fertility[i2].remove(j2)
+                new_align.fertility[i1].remove(j1)
+                new_align.fertility[i2].append(j1)
+                new_align.fertility[i1].append(j2)
 
                 N.add(new_align)
 

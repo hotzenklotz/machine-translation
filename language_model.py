@@ -1,3 +1,4 @@
+# _*_ coding:utf-8 _*_
 from utils import tokenize, nested_defaultdict
 
 
@@ -15,23 +16,23 @@ class LanguageModel():
         for i, sentence in enumerate(corpus):
 
             if i % 100 == 0:
-                print "Processed %s bigrams" % i
+                print "Processed %s sentences for bigrams" % i
 
             # Generate all NGrams and count them
             for (w1, w2) in self.get_bigrams(sentence):
                 bigrams[w1][w2] += 1.0
 
-            # Calculate probabilities
-            num_bigrams = sum([len(w1) for (_, w1) in bigrams.iteritems()])
+        # Calculate probabilities
+        num_bigrams = sum([len(w1) for (_, w1) in bigrams.iteritems()])
 
-            for w1, w2 in bigrams.iteritems():
-                ###
-                # Maximum Likelihood Estimation with Add-One Smoothing
-                # p(w2|w1) = count(w1, w2) + 1 / ( sum_w (count(w1 , w)) + len(bigrams))
-                ###
+        for w1, w2 in bigrams.iteritems():
+            ###
+            # Maximum Likelihood Estimation with Add-One Smoothing
+            # p(w2|w1) = count(w1, w2) + 1 / ( sum_w (count(w1 , w)) + len(bigrams))
+            ###
 
-                num_relevant_bigrams = sum([count for (w2, count) in bigrams[w1].iteritems()])
-                model[w1][w2] = bigrams[w1][w2] + 1.0 / float(num_relevant_bigrams + num_bigrams)
+            num_relevant_bigrams = sum([count for (w2, count) in bigrams[w1].iteritems()])
+            model[w1][w2] = bigrams[w1][w2] + 1.0 / float(num_relevant_bigrams + num_bigrams)
 
         # return DefaultDict{w1, w2 : Prob, ...}
         self.bigrams = model
