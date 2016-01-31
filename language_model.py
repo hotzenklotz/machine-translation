@@ -51,8 +51,8 @@ class LanguageModel():
 
         if len(tokens) < ngram_order:
             # raise Exception("Sentence too short for NGram language model of order %s" % ngram_order)
-            print "Sentence too short for NGram language model of order %s" % ngram_order
-            print sentence
+            # print "Sentence too short for NGram language model of order %s" % ngram_order
+            # print sentence
             return ngrams
 
         for i in range(0, len(tokens) - ngram_order - 1):
