@@ -71,12 +71,13 @@ class IBMModel3:
                         count_d[j][aj][le][lf] += c
                         total_d[aj][le][lf] += c
 
-                        if aj == 0:  # Null insertion
-                            null_insertions += 1
+                        # if aj == 0:  # Null insertion
+                        #     null_insertions += 1
 
                     # Count null insertions
+                    null_insertions = len(a.fertility[0])
                     count_p1 += null_insertions * c
-                    count_p0 += (le - 2 * null_insertions) * c
+                    count_p0 += (le - 2.0 * null_insertions) * c
 
                     # Count fertilities
                     for i, fr_word in enumerate(f_tokens, 1):  # TODO NULL OTKEN OR NOT?
@@ -94,16 +95,16 @@ class IBMModel3:
 
             # M Step :
             # Estimate probability distribution
-            for ((en_word, fr_word), count_t) in iterate_nested_dict(count_t):
-                translations[en_word][fr_word] = count_t / total_f[fr_word]
+            for ((en_word, fr_word), _count_t) in iterate_nested_dict(count_t):
+                translations[en_word][fr_word] = _count_t / total_f[fr_word]
 
             # Estimate distortions
-            for ((j, i, le, fe), count_d) in iterate_nested_dict(count_d):
-                distortions[j][i][le][lf] = count_d / total_d[i][le][lf]
+            for ((j, i, le, fe), _count_d) in iterate_nested_dict(count_d):
+                distortions[j][i][le][lf] = _count_d / total_d[i][le][lf]
 
             # Estimate the fertility, n(Fertility | input word)
-            for ((fertility, fr_word), count_f) in iterate_nested_dict(count_f):
-                fertilities[fertility][fr_word] = count_f / total_f[fr_word]
+            for ((fertility, fr_word), _count_f) in iterate_nested_dict(count_f):
+                fertilities[fertility][fr_word] = _count_f / total_f[fr_word]
 
             # Estimate the probability of null insertion
             p1 = count_p1 / (count_p1 + count_p0)
@@ -187,7 +188,7 @@ class IBMModel3:
     def prob_t_a_given_s(self, sentence_pair):
 
         lf = len(sentence_pair.f_tokens) - 1  # exclude NULL
-        le = len(sentence_pair.e_tokens) - 1
+        le = len(sentence_pair.e_tokens) #- 1
         p1 = self.p1
         p0 = 1 - p1
 

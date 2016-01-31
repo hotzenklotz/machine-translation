@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 import time
 from ibm1 import IBMModel1
 from ibm2 import IBMModel2
@@ -5,6 +6,7 @@ from news_corpus import NewsCorpus
 from language_model import LanguageModel
 from word_alignment import grow_diag_final
 from utils import matrix, tokenize
+import dill
 
 
 def translate(sentence, ibm_model, language_model):
@@ -63,6 +65,10 @@ if __name__ == '__main__':
 
     ibm2_ger_to_en = IBMModel2(ibm1_ger_to_en.translations, ger_en_sentence_pairs)
     ibm2_ger_to_en.train(5)
+
+    # Save a snapshot of the models
+    dill.dump(ibm2_en_to_ger, open("ibm2_en_to_ger.p", "wb"))
+    dill.dump(ibm2_ger_to_en, open("ibm2_ger_to_en.p", "wb"))
 
     print "Translating first 20 test sentences..."
     # Translate the English sentences into German

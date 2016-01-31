@@ -40,7 +40,7 @@ def swap_keys(nested_dict):
     return inverse_dict
 
 
-def matrix(rows_text, columns_text, alignment):
+def matrix(rows, columns, alignment):
     # Prints a matrix of two sentence alignments
 
     '''
@@ -50,9 +50,6 @@ def matrix(rows_text, columns_text, alignment):
     kommen|  x   |      |      |      |
     es    |      |      |      |  x   |
     '''
-
-    rows = rows_text
-    columns = columns_text
 
     longest_row = max(len(x) for x in rows)
     longest_column = max(len(x) for x in columns)
