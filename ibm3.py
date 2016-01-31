@@ -15,7 +15,32 @@ class IBMModel3:
 
         self.distortions = nested_defaultdict(4, int)
         self.fertilities = nested_defaultdict(2, lambda: 0.1)
-        self.p1 = 0
+
+        combinations = set()
+        for pair in sentence_pairs:
+            lf = len(pair.f_tokens)
+            le = len(pair.e_tokens)
+            if (lf, le) not in combinations:
+                combinations.add((lf, le))
+                initial_prob = 1 / lf
+
+                for j in range(1, lf + 1):
+                    for i in range(0, le + 1):
+                        self.distortions[j][i][le][lf] = initial_prob
+
+
+        # simple initialization, taken from GIZA++
+        self.fertilities[0] = defaultdict(lambda: 0.2)
+        self.fertilities[1] = defaultdict(lambda: 0.65)
+        self.fertilities[2] = defaultdict(lambda: 0.1)
+        self.fertilities[3] = defaultdict(lambda: 0.04)
+        MAX_FERTILITY = 10
+        initial_fert_prob = 0.01 / (MAX_FERTILITY - 4)
+
+        for phi in range(4, MAX_FERTILITY):
+            self.fertilities[phi] = defaultdict(lambda: initial_fert_prob)
+
+        self.p1 = 0.5
 
 
     def train(self, num_iterations):
@@ -42,8 +67,6 @@ class IBMModel3:
                 le = len(e_tokens)
                 lf = len(f_tokens) - 1
 
-                null_insertions = 0
-
                 A, best_alignment = self.sample(sentence_pair)
 
                 sentence_pair.alignment = best_alignment.alignment
@@ -57,11 +80,11 @@ class IBMModel3:
                 for a in A:
                     c = self.prob_t_a_given_s(a) / c_total
 
-                    for j in range(1, lf):
+                    for j in range(1, le + 1):
                         aj = a.alignment[j] # shorthand, equivalent to i
 
-                        en_word = e_tokens[j]
-                        fr_word = f_tokens[aj - 1]
+                        en_word = e_tokens[j-1]
+                        fr_word = f_tokens[aj]
 
                         # lexical translations
                         count_t[en_word][fr_word] += c
@@ -71,18 +94,15 @@ class IBMModel3:
                         count_d[j][aj][le][lf] += c
                         total_d[aj][le][lf] += c
 
-                        # if aj == 0:  # Null insertion
-                        #     null_insertions += 1
-
                     # Count null insertions
-                    null_insertions = len(a.fertility[0])
+                    null_insertions = a.fertility[0]
                     count_p1 += null_insertions * c
                     count_p0 += (le - 2.0 * null_insertions) * c
 
                     # Count fertilities
-                    for i, fr_word in enumerate(f_tokens, 1):  # TODO NULL OTKEN OR NOT?
+                    for i, fr_word in enumerate(f_tokens):
                         fertility = 0
-                        for j in range(1, le):
+                        for j in range(1, le + 1):
                             if i == aj:
                                 fertility += 1
 
@@ -119,14 +139,17 @@ class IBMModel3:
     def sample(self, sentence_pair):
         A = set()
 
-        lf = len(sentence_pair.f_tokens)
+        lf = len(sentence_pair.f_tokens) - 1
         le = len(sentence_pair.e_tokens)
 
         def find_best_alignment(j_pegged=None, i_pegged=0):
-            new_alignment = SentencePair(sentence_pair)
+            new_alignment = SentencePair(sentence_pair.english_sentence, sentence_pair.german_sentence)
+
+            lf = len(sentence_pair.f_tokens) - 1
+            le = len(sentence_pair.e_tokens)
 
             # find best alignment according to Model 2
-            for j, fr_word in enumerate(sentence_pair.f_tokens, 1):  # TODO e + 1?
+            for j in range(1, le + 1):
                 if j == j_pegged:
                     best_i = i_pegged
 
@@ -134,16 +157,19 @@ class IBMModel3:
                     best_i = 0
                     max_prob = 0
 
-                    for i, en_word in enumerate(sentence_pair.e_tokens):
-                        prob = self.translations[en_word][fr_word] * self.alignments[i][j][lf - 1][le - 1]
+                    for i in range(0, lf + 1):
+                        en_word = sentence_pair.e_tokens[j-1]
+                        fr_word = sentence_pair.f_tokens[i]
+
+                        prob = self.translations[en_word][fr_word] * self.alignments[i][j][lf][le]
                         if prob >= max_prob:
                             max_prob = prob
                             best_i = i
 
                 new_alignment.alignment[j] = best_i
-                new_alignment.fertility[best_i].append(j)
-
+                new_alignment.fertility[best_i] += 1
             return new_alignment
+
 
         original_alignment = find_best_alignment()
         new_alignment = self.hillclimb(original_alignment)
@@ -152,8 +178,8 @@ class IBMModel3:
 
         best_alignment = new_alignment
 
-        for j in range(1, le + 1):
-            for i in range(0, lf + 1):
+        for j in range(0, lf + 1):
+            for i in range(1, le + 1):
 
                 # best IBM2 alignment
                 original_alignment = find_best_alignment(j, i)
@@ -188,7 +214,7 @@ class IBMModel3:
     def prob_t_a_given_s(self, sentence_pair):
 
         lf = len(sentence_pair.f_tokens) - 1  # exclude NULL
-        le = len(sentence_pair.e_tokens) #- 1
+        le = len(sentence_pair.e_tokens)
         p1 = self.p1
         p0 = 1 - p1
 
@@ -196,7 +222,7 @@ class IBMModel3:
         MIN_PROB = IBMModel3.MIN_PROB
 
         # Combine NULL insert ion probability
-        null_fertility = len(sentence_pair.fertility[0])
+        null_fertility = sentence_pair.fertility[0]
         probability *= (pow(p1, null_fertility) *
                         pow(p0, le - 2 * null_fertility))
         if probability < MIN_PROB:
@@ -210,7 +236,7 @@ class IBMModel3:
 
         # Combine fertility probabilities
         for i in range(1, lf + 1):
-            fertility = len(sentence_pair.fertility[i])
+            fertility = sentence_pair.fertility[i]
             probability *= (factorial(fertility) *
                             self.fertilities[fertility][sentence_pair.f_tokens[i]])
             if probability < MIN_PROB:
@@ -218,9 +244,9 @@ class IBMModel3:
 
         # Combine lexical and distortion probabilities
         for j in range(1, le + 1):
-            e = sentence_pair.e_tokens[j]
+            e = sentence_pair.e_tokens[j-1]
             i = sentence_pair.alignment[j]
-            f = sentence_pair.f_tokens[i - 1] # alignments are one-indexed, tokens zero-indexed
+            f = sentence_pair.f_tokens[i] # alignments are one-indexed, tokens zero-indexed
 
             probability *= (self.translations[e][f] * self.distortions[j][i][lf][le])
             if probability < MIN_PROB:
@@ -231,29 +257,29 @@ class IBMModel3:
     def neighboring(self, sentence_pair, j_pegged=None):
         N = set()
         le = len(sentence_pair.e_tokens)
-        lf = len(sentence_pair.f_tokens)
+        lf = len(sentence_pair.f_tokens) - 1
 
-        for j in range(1, le):
+        for j in range(1, lf + 1):
             # moves
             if j == j_pegged:
                 continue
 
-            for i in range(0, lf):
+            for i in range(1, le + 1):
                 old_i = sentence_pair.alignment[j]
 
-                new_align = SentencePair(sentence_pair) # create a copy
+                new_align = SentencePair(sentence_pair)  # create a copy
                 new_align.alignment[j] = i
-                new_align.fertility[i].append(j)
-                new_align.fertility[old_i].remove(j)
+                new_align.fertility[i] += 1
+                new_align.fertility[old_i] -= 1
 
                 N.add(new_align)
 
-        for j1 in range(1, le):
+        for j1 in range(1, le + 1):
             # swaps
             if j1 == j_pegged:
                 continue
 
-            for j2 in range(1, le):
+            for j2 in range(1, le + 1):
                 if j2 == j_pegged or j2 == j1:
                     continue
 
@@ -261,15 +287,9 @@ class IBMModel3:
                 i1 = sentence_pair.alignment[j1]
                 i2 = sentence_pair.alignment[j2]
 
-
                 # swap a_(j1), a_(j2)
                 new_align.alignment[j1] = i2
                 new_align.alignment[j2] = i1
-
-                new_align.fertility[i2].remove(j2)
-                new_align.fertility[i1].remove(j1)
-                new_align.fertility[i2].append(j1)
-                new_align.fertility[i1].append(j2)
 
                 N.add(new_align)
 

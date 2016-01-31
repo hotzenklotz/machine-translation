@@ -22,7 +22,7 @@ class SentencePair(object):
         self.alignment = defaultdict(int)
         self.alignment_prob = 0.0
 
-        self.fertility = defaultdict(lambda: [])
+        self.fertility = defaultdict(int)
 
     def copyFromObj(self, obj):
 
